@@ -713,10 +713,64 @@ class Game:
         frac = max(0.0, min(1.0, frac))
         filled = int(frac * width)
         self.put(y, x, label)
-        bar_text = "[" + "#" * filled + "-" * (width - filled) + "]"
+        bar_text = "[" + "\u2588" * filled + "\u2591" * (width - filled) + "]"
         if show_num and self.sm.settings.get("show_timer_numbers", True):
             bar_text += f" {frac * 100:3.0f}%"
         self.put(y, x + len(label), bar_text, col)
+
+    def box(self, y, x, h, w, title="", col=0, double=False):
+        """Draw a clean Unicode cockpit frame with optional title badge."""
+        if h < 3 or w < 4:
+            return
+        if double:
+            tl, hz, tr, vt, bl, br = "\u2554", "\u2550", "\u2557", "\u2551", "\u255a", "\u255d"
+        else:
+            tl, hz, tr, vt, bl, br = "\u250c", "\u2500", "\u2510", "\u2502", "\u2514", "\u2518"
+        self.put(y, x, tl + hz * (w - 2) + tr, col)
+        for row in range(y + 1, y + h - 1):
+            self.put(row, x, vt, col)
+            self.put(row, x + w - 1, vt, col)
+        self.put(y + h - 1, x, bl + hz * (w - 2) + br, col)
+        if title and w > len(title) + 6:
+            badge = f" {title} "
+            self.put(y, x + 2, badge, col | curses.A_BOLD)
+
+    def _log_event(self, text, col=0):
+        self.event_log.append((text, col))
+
+    def _draw_reactor_core(self, y, x, w, now, frozen):
+        """Draw an animated ASCII Reactor Core inside the telemetry panel."""
+        if w < 22:
+            return
+        pulse = int(now * (6 if self.stress > 75 else 2)) % 2 == 0
+        if frozen:
+            core_col = self.C(4) | curses.A_BOLD
+            sym = "*" if pulse else "+"
+            state = "CRYO LOCK"
+        elif self.stress > 80 or self.hull < 25:
+            core_col = self.C(3) | curses.A_BOLD
+            sym = "!" if pulse else "X"
+            state = "CRITICAL"
+        elif self.stress > 50 or self.hull < 55:
+            core_col = self.C(2) | curses.A_BOLD
+            sym = "#" if pulse else "="
+            state = "ELEVATED"
+        else:
+            core_col = self.C(1) | curses.A_BOLD
+            sym = "O" if pulse else "o"
+            state = "NOMINAL"
+
+        art = [
+            "   .-===-.   ",
+            f"  / ( {sym} ) \\  ",
+            "  \\  '-'  /  ",
+            "   '-===-'   ",
+        ]
+        cx = x + max(1, (w - 13) // 2)
+        for i, line in enumerate(art):
+            self.put(y + i, cx, line, core_col)
+        lbl = f"CORE: {state}"
+        self.put(y + 4, x + max(1, (w - len(lbl)) // 2), lbl, core_col)
 
     def _cb(self, frac):
         """Colorblind-safe prefix."""
@@ -731,9 +785,15 @@ class Game:
     def screen(self, lines, wait_key=True):
         self.s.erase()
         self.h, self.w = self.s.getmaxyx()
-        top = max(1, (self.h - len(lines)) // 2)
+        box_w = min(self.w - 4, max(46, max((len(t) for t, _ in lines), default=30) + 8))
+        box_h = min(self.h - 2, len(lines) + 4)
+        bx = max(1, (self.w - box_w) // 2)
+        by = max(1, (self.h - box_h) // 2)
+        self.box(by, bx, box_h, box_w, "ORBITAL COMMAND :: TRANSMISSION", self.C(4), double=True)
+        top = by + 2
         for i, (txt, attr) in enumerate(lines):
-            self.center(top + i, txt, attr)
+            if top + i < by + box_h - 1:
+                self.center(top + i, txt, attr)
         self.s.refresh()
         if wait_key:
             self.s.nodelay(False)
@@ -752,23 +812,63 @@ class Game:
 
     # ── menus ───────────────────────────────────────────────────────────────
 
-    def menu(self, title, options, subtitle=""):
+    def menu(self, title, options, subtitle="", hints=None, banner=None):
         sel = 0
         self.s.nodelay(False)
         curses.curs_set(0)
         while True:
             self.s.erase()
             self.h, self.w = self.s.getmaxyx()
-            top = max(1, (self.h - len(options) - 6) // 2)
-            self.center(top, title, self.C(3) | curses.A_BOLD)
+            banner_h = len(banner) + 1 if banner else 0
+            hint_h = 2 if hints else 0
+            box_w = min(
+                self.w - 4,
+                max(
+                    58,
+                    len(subtitle) + 6,
+                    *(len(o) + 14 for o in options),
+                    *(len(b) + 6 for b in (banner or [])),
+                ),
+            )
+            box_h = min(self.h - 2, len(options) + 9 + banner_h + hint_h)
+            bx = max(1, (self.w - box_w) // 2)
+            by = max(1, (self.h - box_h) // 2)
+
+            self.box(by, bx, box_h, box_w, "ORBITAL COMMAND OS :: v2.1", self.C(4), double=True)
+            cur_y = by + 2
+            if banner:
+                for b_line in banner:
+                    self.center(cur_y, b_line, self.C(3) | curses.A_BOLD)
+                    cur_y += 1
+                cur_y += 1
+            else:
+                self.center(cur_y, f"[ {title} ]", self.C(3) | curses.A_BOLD)
+                cur_y += 1
+
             if subtitle:
-                self.center(top + 1, subtitle, self.C(4))
-            base = top + 3
+                self.center(cur_y, subtitle, self.C(4))
+                cur_y += 1
+            self.put(cur_y, bx + 2, "\u2500" * (box_w - 4), self.C(4))
+            cur_y += 1
+
             for i, opt in enumerate(options):
-                attr = curses.A_REVERSE | curses.A_BOLD if i == sel else 0
-                self.center(base + i, f"  {opt}  ", attr)
-            self.center(min(self.h - 2, base + len(options) + 2),
-                        "Up/Down: Navigate   Enter: Select   Esc: Back", self.C(4))
+                if cur_y + i >= by + box_h - (2 + hint_h):
+                    break
+                if i == sel:
+                    label = f" \u25b8  {opt}  \u25c2 "
+                    attr = self.C(4) | curses.A_REVERSE | curses.A_BOLD
+                else:
+                    label = f"    {opt}    "
+                    attr = 0
+                self.center(cur_y + i, label, attr)
+
+            if hints and 0 <= sel < len(hints):
+                hy = by + box_h - 3
+                self.put(hy, bx + 2, "\u2500" * (box_w - 4), self.C(4))
+                self.center(hy + 1, hints[sel], self.C(2))
+
+            self.center(min(self.h - 1, by + box_h + 1),
+                        "[Up/Down] Navigate   [Enter] Select   [Esc] Back", self.C(4))
             self.s.refresh()
             ch = self.s.getch()
             if ch == curses.KEY_UP:
@@ -789,10 +889,14 @@ class Game:
         while True:
             self.s.erase()
             self.h, self.w = self.s.getmaxyx()
-            mid = self.h // 2
-            self.center(mid - 2, "NEW HIGH SCORE!", self.C(1) | curses.A_BOLD)
-            self.center(mid, f"Enter initials: {buf}_", curses.A_BOLD)
-            self.center(mid + 2, "(3 letters, then Enter)", self.C(4))
+            bw = min(self.w - 4, 48)
+            bh = 9
+            bx = max(1, (self.w - bw) // 2)
+            by = max(1, (self.h - bh) // 2)
+            self.box(by, bx, bh, bw, "RECORD QUALIFIED", self.C(1), double=True)
+            self.center(by + 2, "NEW TOP-10 HIGH SCORE!", self.C(1) | curses.A_BOLD)
+            self.center(by + 4, f"OPERATOR CALLSIGN: [ {buf.ljust(3, '_')} ]", curses.A_BOLD)
+            self.center(by + 6, "Type 1-3 letters, then Enter", self.C(4))
             self.s.refresh()
             ch = self.s.getch()
             if ch in (10, 13, curses.KEY_ENTER) and len(buf) >= 1:
@@ -807,6 +911,23 @@ class Game:
     # ── main menu ───────────────────────────────────────────────────────────
 
     def main_menu(self):
+        banner = [
+            "███╗   ███╗███████╗██╗  ████████╗██████╗  ██████╗ ██╗    ██╗███╗   ██╗",
+            "████╗ ████║██╔════╝██║  ╚══██╔══╝██╔══██╗██╔═══██╗██║    ██║████╗  ██║",
+            "██╔████╔██║█████╗  ██║     ██║   ██║  ██║██║   ██║██║ █╗ ██║██╔██╗ ██║",
+            "██║╚██╔╝██║██╔══╝  ██║     ██║   ██║  ██║██║   ██║██║███╗██║██║╚██╗██║",
+            "██║ ╚═╝ ██║███████╗███████╗██║   ██████╔╝╚██████╔╝╚███╔███╔╝██║ ╚████║",
+        ]
+        hint_map = {
+            "New Game": "Launch a Solo, Co-op, or Versus survival run",
+            "Continue": "Resume your auto-saved station shift",
+            "Daily Challenge": "Today's global seeded 5-level gauntlet",
+            "Leaderboard": "Top 10 operator scores and today's daily best",
+            "Achievements": "View all 19 station commendations",
+            "Statistics": "Lifetime accuracy, speed, and mission totals",
+            "Settings": "Audio, colorblind mode, reduced flash & UI options",
+            "Quit": "Power down the orbital console",
+        }
         while True:
             opts = ["New Game"]
             has_save = self.sm.load_state() is not None
@@ -814,8 +935,14 @@ class Game:
                 opts.append("Continue")
             opts += ["Daily Challenge", "Leaderboard", "Achievements",
                      "Statistics", "Settings", "Quit"]
-            choice = self.menu("M E L T D O W N", opts,
-                               "The station is failing. You are the only operator left.")
+            best = self.sm.best_score()
+            ach_got = len(self.sm.data.get("achievements", []))
+            sub = f"BEST: {best}  |  MEDALS: {ach_got}/{len(ACH_DEFS)}"
+            if has_save:
+                sub += "  |  [SAVED RUN READY]"
+            hints = [hint_map[o] for o in opts]
+            use_banner = banner if self.w >= 78 and self.h >= 24 else None
+            choice = self.menu("M E L T D O W N", opts, sub, hints=hints, banner=use_banner)
             if choice == -1 or opts[choice] == "Quit":
                 return "quit"
             picked = opts[choice]
@@ -861,9 +988,10 @@ class Game:
             opts = []
             for k, lb in zip(keys, labels):
                 v = self.sm.settings.get(k, DEFAULT_SETTINGS.get(k, False))
-                opts.append(f"{lb}: {'ON' if v else 'OFF'}")
-            opts.append("Back")
-            ch = self.menu("SETTINGS", opts, "Toggle options")
+                pill = "[ * ON  ]" if v else "[ o OFF ]"
+                opts.append(f"{lb:<22} {pill}")
+            opts.append("Save & Back")
+            ch = self.menu("SYSTEM SETTINGS", opts, "Configure accessibility & audio")
             if ch == -1 or ch == len(keys):
                 Sound.enabled = self.sm.settings.get("sound", True)
                 self.sm.save()
@@ -877,26 +1005,37 @@ class Game:
         self.s.nodelay(False)
         self.s.erase()
         self.h, self.w = self.s.getmaxyx()
-        self.center(1, "LEADERBOARD", self.C(2) | curses.A_BOLD)
-        self.center(2, "-" * 50, self.C(4))
-        row = 4
-        self.put(row, 2, f"{'#':<4}{'NAME':<6}{'SCORE':<10}{'LVL':<6}{'DIFF':<12}{'DATE'}", self.C(4))
-        row += 1
+        bw = min(self.w - 4, 68)
+        bh = min(self.h - 2, 21)
+        bx = max(1, (self.w - bw) // 2)
+        by = max(1, (self.h - bh) // 2)
+        self.box(by, bx, bh, bw, "ORBITAL LEADERBOARD", self.C(4), double=True)
+
+        self.put(by + 2, bx + 3,
+                 f"{'RANK':<6}{'OPR':<7}{'SCORE':<10}{'LVL':<6}{'MODE':<12}{'DATE'}",
+                 self.C(4) | curses.A_BOLD)
+        self.put(by + 3, bx + 2, "\u2500" * (bw - 4), self.C(4))
+
         if not self.sm.scores:
-            self.center(row + 2, "No scores yet. Go play!", self.C(4))
+            self.center(by + 6, "No mission records yet. Deploy to set a score!", self.C(2))
         for i, e in enumerate(self.sm.scores[:10]):
-            self.put(row + i, 2,
-                     f"{i+1:<4}{e.get('name','???'):<6}{e.get('score',0):<10}"
-                     f"{e.get('level',0):<6}{e.get('diff','?'):<12}{e.get('date','?')}")
-        # daily
+            if by + 4 + i >= by + bh - 4:
+                break
+            col = self.C(2) | curses.A_BOLD if i == 0 else (self.C(4) if i < 3 else 0)
+            self.put(
+                by + 4 + i, bx + 3,
+                f"#{i+1:<5}{e.get('name','???'):<7}{e.get('score',0):<10}"
+                f"{e.get('level',0):<6}{e.get('diff','?'):<12}{e.get('date','?')}",
+                col,
+            )
+
         daily = self.sm.get_daily()
-        dy = row + 12
-        self.center(dy, "TODAY'S DAILY CHALLENGE", self.C(2) | curses.A_BOLD)
-        if daily:
-            self.center(dy + 1, f"Best: {daily['score']}  Level: {daily['level']}")
-        else:
-            self.center(dy + 1, "Not attempted yet", self.C(4))
-        self.center(self.h - 2, "Press any key...", self.C(4))
+        dy = by + bh - 4
+        self.put(dy, bx + 2, "\u2500" * (bw - 4), self.C(4))
+        d_txt = (f"DAILY CHALLENGE BEST: {daily['score']}  (LVL {daily['level']})"
+                 if daily else "DAILY CHALLENGE: Not attempted today")
+        self.center(dy + 1, d_txt, self.C(1) if daily else self.C(4))
+        self.center(min(self.h - 1, by + bh + 1), "Press any key to return...", self.C(4))
         self.s.refresh()
         self.s.getch()
 
@@ -906,21 +1045,29 @@ class Game:
         self.s.nodelay(False)
         self.s.erase()
         self.h, self.w = self.s.getmaxyx()
-        self.center(1, "ACHIEVEMENTS", self.C(2) | curses.A_BOLD)
+        bw = min(self.w - 4, 72)
+        bh = min(self.h - 2, len(ACH_DEFS) + 7)
+        bx = max(1, (self.w - bw) // 2)
+        by = max(1, (self.h - bh) // 2)
+        self.box(by, bx, bh, bw, "STATION COMMENDATIONS", self.C(4), double=True)
+
         unlocked = self.sm.data.get("achievements", [])
         total = len(ACH_DEFS)
         got = sum(1 for k in ACH_DEFS if k in unlocked)
-        self.center(2, f"{got}/{total} unlocked", self.C(4))
-        row = 4
+        self.bar(by + 2, bx + 3, f"PROGRESS {got:2d}/{total} ", got / total if total else 0,
+                 min(28, bw - 24), self.C(1), True)
+        self.put(by + 3, bx + 2, "\u2500" * (bw - 4), self.C(4))
+
+        row = by + 4
         for aid, (name, desc) in ACH_DEFS.items():
-            if row >= self.h - 3:
+            if row >= by + bh - 1:
                 break
             done = aid in unlocked
             mark = "[*]" if done else "[ ]"
-            col = self.C(1) if done else self.C(4)
-            self.put(row, 2, f"{mark} {name}: {desc}", col)
+            col = self.C(1) | curses.A_BOLD if done else self.C(4)
+            self.put(row, bx + 3, f"{mark} {name:<18} {desc}"[:bw - 6], col)
             row += 1
-        self.center(self.h - 2, "Press any key...", self.C(4))
+        self.center(min(self.h - 1, by + bh + 1), "Press any key to return...", self.C(4))
         self.s.refresh()
         self.s.getch()
 
@@ -931,27 +1078,31 @@ class Game:
         self.s.erase()
         self.h, self.w = self.s.getmaxyx()
         lt = self.sm.lifetime
-        self.center(1, "LIFETIME STATISTICS", self.C(2) | curses.A_BOLD)
-        lines = [
-            f"Games Played:     {lt.get('total_games', 0)}",
-            f"Total Score:      {lt.get('total_score', 0)}",
-            f"Alarms Answered:  {lt.get('total_correct', 0)}",
-            f"Wrong Answers:    {lt.get('total_wrong', 0)}",
-            f"Alarms Missed:    {lt.get('total_missed', 0)}",
-            f"Best Combo:       x{lt.get('best_combo', 0)}",
-            f"Fastest Answer:   {lt.get('fastest_ever', 0):.2f}s" if lt.get('fastest_ever', 999) < 999 else "Fastest Answer:   ---",
-            f"Total Play Time:  {lt.get('total_play_time', 0) / 60:.1f} min",
-            f"Bosses Defeated:  {len(lt.get('bosses_killed', []))}",
+        bw = min(self.w - 4, 56)
+        bh = 16
+        bx = max(1, (self.w - bw) // 2)
+        by = max(1, (self.h - bh) // 2)
+        self.box(by, bx, bh, bw, "LIFETIME TELEMETRY", self.C(4), double=True)
+
+        fast_str = f"{lt.get('fastest_ever', 0):.2f}s" if lt.get('fastest_ever', 999) < 999 else "---"
+        tc, tw = lt.get("total_correct", 0), lt.get("total_wrong", 0)
+        acc = (tc / (tc + tw) * 100) if (tc + tw) > 0 else 0.0
+        rows = [
+            ("Games Played", str(lt.get("total_games", 0))),
+            ("Total Score", str(lt.get("total_score", 0))),
+            ("Alarms Cleared", str(tc)),
+            ("Wrong Entries", str(tw)),
+            ("Alarms Missed", str(lt.get("total_missed", 0))),
+            ("Best Combo", f"x{lt.get('best_combo', 0)}"),
+            ("Fastest Answer", fast_str),
+            ("Total Flight Time", f"{lt.get('total_play_time', 0) / 60:.1f} min"),
+            ("Bosses Defeated", str(len(lt.get("bosses_killed", [])))),
+            ("Lifetime Accuracy", f"{acc:.1f}%"),
         ]
-        for i, line in enumerate(lines):
-            self.put(4 + i, 4, line)
-        acc = 0
-        tc = lt.get("total_correct", 0)
-        tw = lt.get("total_wrong", 0)
-        if tc + tw > 0:
-            acc = tc / (tc + tw) * 100
-        self.put(4 + len(lines) + 1, 4, f"Lifetime Accuracy: {acc:.1f}%", self.C(1) if acc > 70 else self.C(2))
-        self.center(self.h - 2, "Press any key...", self.C(4))
+        for i, (k, v) in enumerate(rows):
+            col = (self.C(1) if acc > 70 else self.C(2)) if k == "Lifetime Accuracy" else 0
+            self.put(by + 2 + i, bx + 4, f"{k:<22} {v}", col)
+        self.center(min(self.h - 1, by + bh + 1), "Press any key to return...", self.C(4))
         self.s.refresh()
         self.s.getch()
 
@@ -962,30 +1113,37 @@ class Game:
         self.s.erase()
         self.h, self.w = self.s.getmaxyx()
         st = self.stats
-        self.center(1, "MISSION REPORT", self.C(2) | curses.A_BOLD)
-        lines = [
-            f"Score:           {self.score}",
-            f"Accuracy:        {st.accuracy:.1f}%",
-            f"Correct:         {st.correct}",
-            f"Wrong:           {st.wrong}",
-            f"Missed:          {st.missed}",
-            f"Longest Combo:   x{st.combo_max}",
-            f"Fastest Answer:  {st.fastest:.2f}s" if st.fastest < 999 else "Fastest Answer:  ---",
-            f"Avg Response:    {st.avg_resp:.2f}s" if st.responses else "Avg Response:    ---",
-            f"Most Missed:     {st.worst_type.upper()}",
-            f"Power-ups Used:  {st.powerups}",
-            f"Survival Time:   {st.play_time:.0f}s",
+        bw = min(self.w - 4, 58)
+        extra = min(5, len(self.ach_queue) + 2) if self.ach_queue else 0
+        bh = min(self.h - 2, 15 + extra)
+        bx = max(1, (self.w - bw) // 2)
+        by = max(1, (self.h - bh) // 2)
+        self.box(by, bx, bh, bw, "MISSION DEBRIEF", self.C(2), double=True)
+
+        rows = [
+            ("Final Score", str(self.score)),
+            ("Accuracy", f"{st.accuracy:.1f}%"),
+            ("Correct / Wrong", f"{st.correct} / {st.wrong}"),
+            ("Alarms Missed", str(st.missed)),
+            ("Longest Combo", f"x{st.combo_max}"),
+            ("Fastest Answer", f"{st.fastest:.2f}s" if st.fastest < 999 else "---"),
+            ("Avg Response", f"{st.avg_resp:.2f}s" if st.responses else "---"),
+            ("Most Missed Type", st.worst_type.upper()),
+            ("Power-ups Used", str(st.powerups)),
+            ("Survival Time", f"{st.play_time:.0f}s"),
         ]
-        for i, line in enumerate(lines):
-            self.put(4 + i, 4, line)
-        # show newly unlocked achievements
+        for i, (k, v) in enumerate(rows):
+            if by + 2 + i < by + bh - 1:
+                self.put(by + 2 + i, bx + 4, f"{k:<22} {v}")
         if self.ach_queue:
-            ay = 4 + len(lines) + 1
-            self.center(ay, "ACHIEVEMENTS UNLOCKED:", self.C(1) | curses.A_BOLD)
-            for j, aid in enumerate(self.ach_queue[:4]):
-                name = ACH_DEFS.get(aid, ("?", ""))[0]
-                self.center(ay + 1 + j, f"  * {name}", self.C(1))
-        self.center(self.h - 2, "Press any key...", self.C(4))
+            ay = by + 13
+            if ay < by + bh - 2:
+                self.center(ay, "MEDALS UNLOCKED:", self.C(1) | curses.A_BOLD)
+                for j, aid in enumerate(self.ach_queue[:3]):
+                    if ay + 1 + j < by + bh - 1:
+                        name = ACH_DEFS.get(aid, ("?", ""))[0]
+                        self.center(ay + 1 + j, f"* {name}", self.C(1))
+        self.center(min(self.h - 1, by + bh + 1), "Press any key to continue...", self.C(4))
         self.s.refresh()
         self.s.getch()
         self.ach_queue.clear()
