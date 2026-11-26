@@ -13,7 +13,7 @@
 
 <img src="screenshot.svg" alt="MELTDOWN gameplay in a terminal" width="720">
 
-<sub>Illustration of the game screen (Level 4: Solar Flare).</sub>
+<sub>Yup ! Illustration of the game screen (Level 4: Solar Flare).</sub>
 
 </div>
 
