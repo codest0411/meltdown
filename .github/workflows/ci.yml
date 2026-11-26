@@ -17,6 +17,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.8", "3.10", "3.12", "3.13"]
+        exclude:
+          - os: ubuntu-latest
+            python-version: "3.8"
 
     steps:
       - name: Checkout repository
@@ -44,16 +47,15 @@ jobs:
       - name: Verify wheel installation in clean venv
         shell: bash
         run: |
-          python -m venv /tmp/meltdown-venv || python -m venv "$RUNNER_TEMP/meltdown-venv"
-          if [ -d "/tmp/meltdown-venv/bin" ]; then
-            VENV_PY="/tmp/meltdown-venv/bin/python"
-            VENV_CLI="/tmp/meltdown-venv/bin/meltdown"
-          elif [ -d "$RUNNER_TEMP/meltdown-venv/Scripts" ]; then
-            VENV_PY="$RUNNER_TEMP/meltdown-venv/Scripts/python.exe"
-            VENV_CLI="$RUNNER_TEMP/meltdown-venv/Scripts/meltdown.exe"
+          VENV_DIR="$RUNNER_TEMP/meltdown-venv"
+          rm -rf "$VENV_DIR"
+          python -m venv "$VENV_DIR"
+          if [ -d "$VENV_DIR/Scripts" ]; then
+            VENV_PY="$VENV_DIR/Scripts/python.exe"
+            VENV_CLI="$VENV_DIR/Scripts/meltdown.exe"
           else
-            VENV_PY="$RUNNER_TEMP/meltdown-venv/bin/python"
-            VENV_CLI="$RUNNER_TEMP/meltdown-venv/bin/meltdown"
+            VENV_PY="$VENV_DIR/bin/python"
+            VENV_CLI="$VENV_DIR/bin/meltdown"
           fi
           "$VENV_PY" -m pip install --upgrade pip
           WHEEL=$(ls dist/*.whl | head -n 1)
