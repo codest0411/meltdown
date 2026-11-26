@@ -14,6 +14,7 @@ Features:  10 alarm types · 7 handcrafted levels + endless mode · 3 boss fight
            achievements · leaderboard · save/resume · story events · accessibility
 """
 
+import collections
 import copy
 import curses
 import hashlib
@@ -28,13 +29,28 @@ from datetime import date, datetime
 #  DATA
 # ═══════════════════════════════════════════════════════════════════════════════
 
-WORDS = [
-    "reactor", "coolant", "plasma", "airlock", "thruster", "oxygen", "gravity",
-    "quantum", "fusion", "hatch", "vacuum", "orbit", "warp", "shield", "core",
-    "valve", "circuit", "turbine", "pressure", "cryo", "nebula", "meteor",
-    "ignite", "eject", "breach", "sensor", "uplink", "photon", "isotope",
-    "helium", "piston", "beacon", "carbon", "dynamo", "flare", "impulse",
+WORDS_EASY = [
+    "core", "warp", "fuel", "hull", "beam", "dock", "scan", "flux",
+    "cryo", "orbit", "valve", "eject", "hatch", "flare", "pulse", "laser",
+    "solar", "spark", "relay", "gauge", "cable", "rotor", "nodes", "alarm",
 ]
+
+WORDS_MED = [
+    "reactor", "coolant", "plasma", "airlock", "oxygen", "gravity", "quantum",
+    "fusion", "vacuum", "shield", "circuit", "turbine", "nebula", "meteor",
+    "ignite", "breach", "sensor", "uplink", "photon", "isotope", "helium",
+    "piston", "beacon", "carbon", "dynamo", "impulse",
+]
+
+WORDS_HARD = [
+    "thruster", "pressure", "containment", "overdrive", "radiation",
+    "antimatter", "telemetry", "navigation", "propulsion", "stabilizer",
+    "supernova", "magnetic", "ventilation", "hyperdrive", "singularity",
+    "capacitor", "oscillator", "emergency", "cryogenic", "trajectory",
+    "diagnostics", "quarantine", "subroutine", "atmosphere", "wavelength",
+]
+
+WORDS = WORDS_EASY + WORDS_MED + WORDS_HARD
 
 SHORT_WORDS = [
     "core", "warp", "fuel", "hull", "beam", "dock", "scan", "flux", "ion",
@@ -486,8 +502,31 @@ def daily_seed():
 #  ALARM
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _pick_unique(pool, recent=None):
+    """Pick a random item from pool, avoiding items in recent when possible."""
+    if recent:
+        fresh = [x for x in pool if x not in recent]
+        if fresh:
+            choice = random.choice(fresh)
+            recent.append(choice)
+            return choice
+    choice = random.choice(pool)
+    if recent is not None:
+        recent.append(choice)
+    return choice
+
+
+def _word_pool_for_level(level):
+    """Return progressively harder word pools as level increases."""
+    if level <= 1:
+        return WORDS_EASY + WORDS_MED
+    if level <= 4:
+        return WORDS_MED + WORDS_HARD
+    return WORDS_HARD + (WORDS_MED if level < 7 else [])
+
+
 class Alarm:
-    def __init__(self, kind, ttl, now):
+    def __init__(self, kind, ttl, now, level=0, recent=None):
         self.kind = kind
         self.ttl = ttl
         self.born = now
@@ -495,14 +534,16 @@ class Alarm:
         self.is_boss = False
         self.is_powerup = False
 
+        word_pool = _word_pool_for_level(level)
+
         if kind == "type":
-            w = random.choice(WORDS)
+            w = _pick_unique(word_pool, recent)
             self.label, self.text, self.answer = "TYPE", w.upper(), w
         elif kind == "reverse":
-            w = random.choice(WORDS)
+            w = _pick_unique(word_pool, recent)
             self.label, self.text, self.answer = "REVERSE", w.upper(), w[::-1]
         elif kind == "scramble":
-            w = random.choice(WORDS)
+            w = _pick_unique(word_pool, recent)
             letters = list(w)
             for _ in range(20):
                 random.shuffle(letters)
@@ -510,31 +551,62 @@ class Alarm:
                     break
             self.label, self.text, self.answer = "UNSCRAMBLE", "".join(letters).upper(), w
         elif kind == "math":
-            a, b = random.randint(3, 15), random.randint(2, 12)
-            op = random.choice("+-*")
+            lo = 3 + level * 3
+            hi = 15 + level * 7
+            b_lo = 2 + level * 2
+            b_hi = 12 + level * 4
+            expr = None
+            for _ in range(15):
+                op = random.choice("+-*")
+                if op == "*":
+                    a = random.randint(max(3, 3 + level), max(12, 10 + level * 2))
+                    b = random.randint(max(2, 2 + level // 2), max(9, 8 + level * 2))
+                else:
+                    a = random.randint(lo, hi)
+                    b = random.randint(b_lo, b_hi)
+                cand = f"{a} {op} {b}"
+                if not recent or cand not in recent:
+                    expr = (a, op, b, cand)
+                    break
+            if expr is None:
+                a, op, b = random.randint(lo, hi), random.choice("+-*"), random.randint(b_lo, b_hi)
+                expr = (a, op, b, f"{a} {op} {b}")
+            a, op, b, cand = expr
+            if recent is not None:
+                recent.append(cand)
             res = {"+": a + b, "-": a - b, "*": a * b}[op]
-            self.label, self.text, self.answer = "SOLVE", f"{a} {op} {b}", str(res)
+            self.label, self.text, self.answer = "SOLVE", cand, str(res)
         elif kind == "memory":
-            code = "".join(random.choice("0123456789") for _ in range(random.randint(4, 6)))
+            length = min(8, random.randint(4 + level // 3, 6 + level // 3))
+            code = "".join(random.choice("0123456789") for _ in range(length))
             self.label, self.text, self.answer = "MEMORIZE", code, code
             self.hide_after = now + 2.0
         elif kind == "sequence":
-            start = random.randint(1, 10)
-            step = random.randint(2, 5)
+            step_lo = 2 + level
+            step_hi = 5 + level * 2
+            step = random.randint(step_lo, step_hi)
+            if level >= 4 and random.random() < 0.35:
+                step = -step
+                start = random.randint(abs(step) * 4 + 2, abs(step) * 4 + 20 + level * 4)
+            else:
+                start = random.randint(1 + level * 2, 10 + level * 5)
             seq = [start + step * i for i in range(4)]
             nxt = start + step * 4
             self.label = "SEQUENCE"
             self.text = ", ".join(str(x) for x in seq) + ", ?"
             self.answer = str(nxt)
         elif kind == "binary":
-            num = random.randint(3, 63)
+            lo = 3 if level <= 3 else (16 if level <= 5 else 32)
+            hi = 31 if level <= 3 else (63 if level <= 5 else min(255, 63 + level * 12))
+            num = random.randint(lo, hi)
             self.label, self.text, self.answer = "BINARY", bin(num)[2:], str(num)
         elif kind == "morse":
-            w = random.choice(SHORT_WORDS)
+            pool = SHORT_WORDS if level <= 4 else (SHORT_WORDS + WORDS_EASY)
+            w = _pick_unique(pool, recent)
             m = "  ".join(MORSE.get(c.upper(), "?") for c in w)
             self.label, self.text, self.answer = "MORSE", m, w
         elif kind == "decode":
-            w = random.choice(WORDS)
+            w = _pick_unique(word_pool, recent)
             def _corrupt(word):
                 chars = list(word.upper())
                 n = max(1, len(word) // 3)
@@ -549,11 +621,12 @@ class Alarm:
                 c2 = _corrupt(w)
             self.label, self.text, self.answer = "DECODE", f"{c1} | {c2}", w
         elif kind == "seqlock":
-            dirs = "".join(random.choice("udlr") for _ in range(random.randint(4, 7)))
+            length = min(8, random.randint(4 + level // 3, 6 + level // 3))
+            dirs = "".join(random.choice("udlr") for _ in range(length))
             self.label, self.text, self.answer = "SEQ LOCK", dirs.upper(), dirs
             self.hide_after = now + 2.5
         else:
-            w = random.choice(WORDS)
+            w = _pick_unique(word_pool, recent)
             self.label, self.text, self.answer = "TYPE", w.upper(), w
 
     def shown(self, now):
@@ -617,6 +690,7 @@ class Game:
         self.pup_bonus = 0.0     # extra power-up chance from choices
         self.freeze_until = 0.0
         self.daily = False
+        self.recent_prompts = collections.deque(maxlen=15)
         # co-op state
         self.active_p = 0        # 0=P1, 1=P2
         self.p_combos = [0, 0]
@@ -1215,7 +1289,8 @@ class Game:
                         msg, msg_col, msg_until = "!! SURGE !!", R, now + 1.5
                         Sound.surge()
                     for _ in range(count):
-                        alarms.append(Alarm(random.choice(kinds), ttl, now))
+                        alarms.append(Alarm(random.choice(kinds), ttl, now,
+                                            level=idx, recent=self.recent_prompts))
                     next_spawn = now + spawn * random.uniform(0.6, 1.4)
 
             # ── power-up spawn ──
@@ -1517,7 +1592,9 @@ class Game:
             active_reg = sum(1 for a in alarms if not a.is_boss)
             if now >= next_spawn and active_reg < 3:
                 alarms.append(Alarm(random.choice(reg_kinds),
-                                    10 * d["ttl"], now))
+                                    10 * d["ttl"], now,
+                                    level=(boss_idx + 1) * 2,
+                                    recent=self.recent_prompts))
                 next_spawn = now + reg_spawn * random.uniform(0.7, 1.3)
 
             # boss stress attack

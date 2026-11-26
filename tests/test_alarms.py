@@ -104,3 +104,24 @@ def test_difficulty_presets_exist():
 def test_daily_seed_is_deterministic():
     assert daily_seed() == daily_seed()
     assert isinstance(daily_seed(), int)
+
+
+def test_level_scaling_and_recent_dedup():
+    import collections
+    from meltdown.game import WORDS_HARD
+
+    now = time.time()
+    recent = collections.deque(maxlen=15)
+    seen = []
+    for _ in range(10):
+        a = Alarm("type", 10.0, now, level=7, recent=recent)
+        assert a.answer in WORDS_HARD
+        seen.append(a.answer)
+    assert len(set(seen)) == 10
+
+    # Higher-level math produces larger operands than level 0
+    hi_vals = [
+        max(int(x) for x in Alarm("math", 10.0, now, level=8).text.split()[::2])
+        for _ in range(20)
+    ]
+    assert max(hi_vals) > 20

@@ -39,6 +39,7 @@ def test_python_m_meltdown_runs_from_outside_repo(tmp_path):
         [sys.executable, "-m", "meltdown", "--version"],
         cwd=str(tmp_path),
         env=env,
+        stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
         check=True,
