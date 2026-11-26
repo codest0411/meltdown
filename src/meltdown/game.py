@@ -14,11 +14,13 @@ Features:  10 alarm types · 7 handcrafted levels + endless mode · 3 boss fight
            achievements · leaderboard · save/resume · story events · accessibility
 """
 
+import copy
 import curses
 import hashlib
 import json
 import os
 import random
+import sys
 import time
 from datetime import date, datetime
 
@@ -204,6 +206,16 @@ POWERUP_TYPES = [
 #  SAVE SYSTEM
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def get_save_dir(data_dir=None):
+    """Return the directory for persistent user save data."""
+    if data_dir:
+        return data_dir
+    env_dir = os.environ.get("MELTDOWN_DATA_DIR")
+    if env_dir:
+        return env_dir
+    return os.path.join(os.path.expanduser("~"), ".meltdown")
+
+
 SAVE_DIR = os.path.join(os.path.expanduser("~"), ".meltdown")
 SAVE_FILE = os.path.join(SAVE_DIR, "data.json")
 
@@ -231,21 +243,27 @@ DEFAULT_DATA = {
 
 
 class SaveManager:
-    def __init__(self):
-        self.data = dict(DEFAULT_DATA)
+    def __init__(self, data_dir=None):
+        self.save_dir = get_save_dir(data_dir)
+        self.save_file = os.path.join(self.save_dir, "data.json")
+        self.data = copy.deepcopy(DEFAULT_DATA)
         self._load()
 
     def _load(self):
         try:
-            with open(SAVE_FILE) as f:
+            with open(self.save_file, encoding="utf-8") as f:
                 loaded = json.load(f)
+            if not isinstance(loaded, dict):
+                return
             for k in DEFAULT_DATA:
                 if k in loaded:
                     if isinstance(DEFAULT_DATA[k], dict) and isinstance(loaded[k], dict):
-                        merged = dict(DEFAULT_DATA[k])
+                        merged = copy.deepcopy(DEFAULT_DATA[k])
                         merged.update(loaded[k])
                         self.data[k] = merged
-                    else:
+                    elif isinstance(DEFAULT_DATA[k], list) and isinstance(loaded[k], list):
+                        self.data[k] = loaded[k]
+                    elif not isinstance(DEFAULT_DATA[k], (dict, list)):
                         self.data[k] = loaded[k]
         except Exception:
             pass
@@ -253,7 +271,7 @@ class SaveManager:
         old = os.path.join(os.path.expanduser("~"), ".meltdown_highscore.json")
         if os.path.exists(old):
             try:
-                with open(old) as f:
+                with open(old, encoding="utf-8") as f:
                     ob = json.load(f)
                 if ob.get("best", 0) > 0 and not self.data["scores"]:
                     self.data["scores"].append({
@@ -265,8 +283,8 @@ class SaveManager:
 
     def save(self):
         try:
-            os.makedirs(SAVE_DIR, exist_ok=True)
-            with open(SAVE_FILE, "w") as f:
+            os.makedirs(self.save_dir, exist_ok=True)
+            with open(self.save_file, "w", encoding="utf-8") as f:
                 json.dump(self.data, f, indent=2)
         except Exception:
             pass
@@ -1919,8 +1937,22 @@ def main(stdscr):
     g.main_menu()
 
 
-if __name__ == "__main__":
+def run() -> int:
+    """Launch the game inside curses, restoring the terminal on exit."""
     try:
         curses.wrapper(main)
+        return 0
     except KeyboardInterrupt:
         print("Station abandoned. Coward.")
+        return 0
+    except curses.error as exc:
+        print(
+            f"Terminal error: {exc}\n"
+            "Ensure your terminal supports curses and is at least 80x24.",
+            file=sys.stderr,
+        )
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(run())

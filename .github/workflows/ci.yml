@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.10", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run test suite
+        run: pytest
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Validate distribution metadata
+        run: twine check dist/*
+
+      - name: Verify wheel installation in clean venv
+        shell: bash
+        run: |
+          python -m venv /tmp/meltdown-venv || python -m venv "$RUNNER_TEMP/meltdown-venv"
+          if [ -d "/tmp/meltdown-venv/bin" ]; then
+            VENV_PY="/tmp/meltdown-venv/bin/python"
+            VENV_CLI="/tmp/meltdown-venv/bin/meltdown"
+          elif [ -d "$RUNNER_TEMP/meltdown-venv/Scripts" ]; then
+            VENV_PY="$RUNNER_TEMP/meltdown-venv/Scripts/python.exe"
+            VENV_CLI="$RUNNER_TEMP/meltdown-venv/Scripts/meltdown.exe"
+          else
+            VENV_PY="$RUNNER_TEMP/meltdown-venv/bin/python"
+            VENV_CLI="$RUNNER_TEMP/meltdown-venv/bin/meltdown"
+          fi
+          "$VENV_PY" -m pip install --upgrade pip
+          WHEEL=$(ls dist/*.whl | head -n 1)
+          "$VENV_PY" -m pip install "$WHEEL"
+          cd "$RUNNER_TEMP"
+          "$VENV_CLI" --version
+          "$VENV_CLI" --help
+          "$VENV_PY" -m meltdown --version
