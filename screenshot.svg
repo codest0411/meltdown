@@ -2,7 +2,7 @@
 <rect width="780" height="510" rx="12" fill="#0d1117" stroke="#30363d"/>
 <rect width="780" height="36" rx="12" fill="#161b22"/><rect y="24" width="780" height="12" fill="#161b22"/>
 <circle cx="22" cy="18" r="6" fill="#f85149"/><circle cx="42" cy="18" r="6" fill="#d29922"/><circle cx="62" cy="18" r="6" fill="#3fb950"/>
-<text x="390" y="23" text-anchor="middle" fill="#8b949e" font-size="13">Yup! python3 meltdown.py</text>
+<text x="390" y="23" text-anchor="middle" fill="#8b949e" font-size="13">python3 meltdown.py</text>
 <rect x="16" y="52" width="748" height="24" fill="#39c5cf"/>
 <text x="24" y="70" fill="#0d1117" xml:space="preserve">MELTDOWN :: LVL 4 SOLAR FLARE</text>
 <text x="24" y="100" xml:space="preserve"><tspan fill="#c9d1d9">SCORE 2350   BEST 4120   COMBO x5   PROGRESS 7/12</tspan></text>
