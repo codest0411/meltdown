@@ -22,7 +22,7 @@ WORDS = [
     "ignite", "eject", "breach", "sensor", "uplink", "photon", "isotope",
 ]
 
-# name, flavour, quota, spawn_secs, alarm_ttl, max_active, pressure, kinds, glitch, surge
+# name, flavour, quota, spawn_secs, alarm_ttl, max_active, pressure, kinds, glitch, surge, Yup!
 LEVELS = [
     ("BOOT SEQUENCE",  "Easy does it. Systems warming up...",       6, 3.5, 14, 2, 0.8, ["type"], False, False),
     ("COOLANT LEAK",   "Things are getting slippery.",              8, 3.0, 12, 3, 1.0, ["type", "reverse"], False, False),
