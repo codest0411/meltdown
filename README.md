@@ -50,8 +50,6 @@ Alarms keep firing, the timers keep shrinking, and your stress keeps rising. Ans
 
 ## 🚀 Installation
 
-> **Note:** Once `meltdown-terminal` is published to PyPI, you can install it globally with `pipx` or `pip`:
-
 ### Recommended (`pipx`)
 
 ```bash
@@ -68,7 +66,7 @@ pip install meltdown-terminal
 meltdown
 ```
 
-### Installing from local source (before PyPI release)
+### Installing from source
 
 ```bash
 git clone https://github.com/codest0411/meltdown.git
@@ -207,4 +205,4 @@ Released under the [MIT License](LICENSE).
 
 - **GitHub Repository:** https://github.com/codest0411/meltdown
 - **Issue Tracker:** https://github.com/codest0411/meltdown/issues
-- **PyPI Package:** *Pending initial PyPI release (`meltdown-terminal`)*
+- **PyPI Package:** https://pypi.org/project/meltdown-terminal/
