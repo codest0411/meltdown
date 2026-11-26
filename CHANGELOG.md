@@ -5,6 +5,19 @@ All notable changes to **MELTDOWN** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-11-26
+
+### Added
+- **Reactor Cockpit UI/UX Redesign**:
+  - Responsive 2-column cockpit layout on terminals ≥ 96×22 (`INCOMING ALARMS` + `REACTOR TELEMETRY`) with automatic compact fallback on 80×24.
+  - Live animated ASCII **Reactor Core** that shifts color and symbol with stress, hull, and cryo-freeze status.
+  - Smooth Unicode block progress bars (`█░`), urgency badges (`[SAFE]`, `[WARN]`, `[CRIT]`, `[PWR]`, `[BOSS]`), and a live `COMMS LOG`.
+  - Box-drawn menus (`MELTDOWN v2.1 :: REACTOR CONSOLE`) and modal screens.
+- **Level-Scaled Words & Calculations**:
+  - Tiered word pools (`WORDS_EASY`, `WORDS_MED`, `WORDS_HARD`) that progress with level.
+  - Non-repeating prompt history across levels and boss fights.
+  - Scaling difficulty for `SOLVE` math, `SEQUENCE` (including descending sequences), `BINARY`, `MEMORIZE`, and `SEQ LOCK`.
+
 ## [2.0.0] - 2026-11-26
 
 ### Added
