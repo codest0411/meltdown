@@ -1,6 +1,6 @@
 <div align="center">
 
-# ☢️ MELTDOWN v3.0.0
+# ☢️ MELTDOWN v4.0.0
 
 ### A stressful, fast-typing survival game that runs entirely in your terminal.
 
@@ -29,21 +29,26 @@ Alarms keep firing, the timers keep shrinking, and your stress keeps rising. Ans
 
 - 🎮 **7 handcrafted levels** that get faster and meaner, then **endless mode** after that
 - ⏱️ **Multiple alarms at once**, each with its own countdown
-- 🧠 **10 alarm types**: `type`, `reverse`, `solve`, `unscramble`, `memorize`, `sequence`, `binary`, `morse`, `decode`, `seq lock`
+- 🧠 **20 alarm types**: `type`, `reverse`, `solve`, `unscramble`, `memorize`, `sequence`, `binary`, `morse`, `decode`, `seq lock`, `hex/octal`, `logic`, `ping/port`, `typo hunt`, `vent mash`, `regex`, `symbol`, `checksum`, `cipher`, `dual-lock`
 - 😰 **Stress and hull meters** — lose either one and the station is lost
 - 🔥 **Combo multiplier** for streaks, wiped out by one mistake
-- 📺 **Random events**: corrupted displays and alarm surges
+- 📺 **Random events**: corrupted displays, alarm surges, and **station hazards** (`Overheat`, `EMP Flicker`, `Radiation Leak`, `Low Oxygen`)
 - 🔋 **Power-ups**: freeze time (`freeze`), repair hull (`repair`), calm stress (`calm`), clear alarms (`clear`)
-- 👾 **3 boss fights**: *The Sentinel*, *The Guardian*, and *The Core*
-- ⚙️ **3 difficulty modes**: Casual, Operator, Nightmare
+- 🛠️ **Reactor Bay Perks & Sector Navigation**: draft permanent upgrades and choose branching station sectors between levels
+- 👾 **3 boss fights**: *The Sentinel*, *The Guardian*, and *The Core* (plus **Boss Rush** mode)
+- ⚙️ **3 difficulty modes & Mutators**: Casual, Operator, Nightmare, plus *Glass Cannon*, *Blindfold*, and *Turbo*
+- 🧪 **Training, Sandbox & Challenges**: Practice mode, Custom Sandbox (`SBX-...` shareable codes), **Daily Challenge**, and **Weekly Challenge**
 - 📖 **Story events**: narrative transmissions and strategic choices between levels
-- 👥 **Two-player modes**: Co-op (shared screen) and Versus (seeded head-to-head)
-- 🏆 **Top-10 leaderboard** with daily challenge rankings
-- 🎖️ **19 achievements** to unlock
+- 👥 **Multiplayer**: Co-op (shared screen), Versus (seeded head-to-head), and **LAN / Room-Code Versus**
+- 🎬 **Replay Theater & Ghost Racing**: watch saved runs at `1x`/`2x`/`4x`, race your personal-best Ghost bar, and export animated SVG replays (`--record`)
+- 🧩 **Custom Mods**: load custom word packs (`~/.meltdown/words.txt`) and custom alarm plugins (`~/.meltdown/plugins/*.py`)
+- 🎨 **Orbital Command OS UI**: 2-column telemetry cockpit, live ASCII Reactor Core, 4 color themes, unlockable skins, and CRT Hazard Box Game Over screen
+- 🏆 **Top-10 leaderboard** with daily & weekly challenge rankings, **Operator Rank** (`S+`–`D`), and shareable Run Cards
+- 🎖️ **19 achievements** and an in-game **Field Manual**
 - 📊 **Detailed statistics**: accuracy, response times, longest combo, and more
 - 💾 **Save & resume**: quit mid-run and continue later (`~/.meltdown/data.json`)
-- ♿ **Accessibility options**: reduced flash, colorblind mode, large UI, timer numbers
-- 🔊 **Sound effects** (toggle-able terminal beeps)
+- ♿ **Accessibility options**: reduced flash, colorblind mode, large UI, timer numbers, ASCII progress bars
+- 🔊 **Cross-platform audio**: non-blocking synthesized tones, combo chimes, warning pulses, and multi-tone chords (zero dependencies)
 - 📦 **Minimal dependencies**: standard library only on macOS/Linux (`windows-curses` on Windows)
 
 ---
@@ -110,6 +115,18 @@ Run as a Python module:
 python -m meltdown
 ```
 
+Export an animated SVG replay of your run:
+
+```bash
+meltdown --record
+```
+
+Configure Windows PowerShell `meltdown` function (if `.exe` wrappers are blocked):
+
+```bash
+meltdown setup-shell
+```
+
 ---
 
 ## 🖥️ Supported Operating Systems & Requirements
@@ -137,6 +154,16 @@ python -m meltdown
 | `MORSE` | Decode the morse code | `.-  .-.  -.-.` → `arc` |
 | `DECODE` | Identify the word from two corrupted versions | `R#CT$R \| R$@CT#R` → `reactor` |
 | `SEQ LOCK` | Remember the direction sequence before it hides | `UDLRU` → `udlru` |
+| `HEX/OCTAL` | Convert hexadecimal (`0x..`) or octal (`0o..`) to decimal | `0x2F` → `47` |
+| `LOGIC GATE` | Evaluate boolean gate (`0` or `1`) | `1 XOR 0` → `1` |
+| `PING/PORT` | Type the target port shown in the log | `ERR@CORE::PORT:8080` → `8080` |
+| `TYPO HUNT` | Type the misspelled word in the pair | `ORBIT \| ORBXT` → `orbxt` |
+| `VENT MASH` | Submit the short key 3 times to vent | `VENT (3 left)` → `vent` (×3) |
+| `REGEX` | Type any string matching the pattern | `MATCH ^[a-z]{2}[0-9]{2}$` → `ab12` |
+| `SYMBOL` | Map symbols (`1:^ 2:* 3:# 4:@`) to digits | `^ * # ^` → `1231` |
+| `CHECKSUM` | Sum all digits of the packet ID | `PKT-4819 (SUM)` → `22` |
+| `CIPHER +1` | Decode Caesar +1 shifted word (-1 each letter) | `BQQMF` → `apple` |
+| `DUAL-LOCK` | Clear Stage 1 word, then Stage 2 word | `CORE` → `WARP` |
 
 Capital letters do not matter. Answer in any order: your input is matched against all active alarms.
 
