@@ -1,6 +1,6 @@
 <div align="center">
 
-# ☢️ MELTDOWN v2.0
+# ☢️ MELTDOWN V3.0.0
 
 ### A stressful, fast-typing survival game that runs entirely in your terminal.
 
