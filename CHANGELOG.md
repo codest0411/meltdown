@@ -5,6 +5,18 @@ All notable changes to **MELTDOWN** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-11-27
+
+### Added
+- **Modular Package Architecture**: Split game into `alarms.py`, `audio.py`, `bosses.py`, `lan.py`, `save.py`, `themes.py`, and `game.py`.
+- **5 New Alarm Types** (15 total): `HEX/OCTAL`, `LOGIC GATE`, `PING/PORT`, `TYPO HUNT`, and `VENT MASH` (`x3`).
+- **Station Hazards**: `Overheat`, `EMP Flicker`, `Radiation Leak` (`PURGE`), and `Low Oxygen` (`OXYGEN`).
+- **Reactor Bay Upgrade Draft (Perks)**: `Auto-Coolant`, `Reinforced Bulkhead`, `Buffer Shield`, `Quick Fingers`, and `Power-up Magnet`.
+- **New Modes & Mutators**: `Boss Rush`, `Practice / Training`, `Custom Sandbox` (`SBX-...` shareable codes), `LAN Versus` (TCP sockets), plus `Glass Cannon`, `Blindfold`, and `Turbo` mutators.
+- **Cross-Platform Audio Engine**: Non-blocking `winsound.Beep` on Windows and synthesized WAV playback via `afplay`/`aplay`/`paplay` on macOS/Linux with combo chimes and warning pulses.
+- **Themes, Skins & Visual Polish**: `Cyber Cyan`, `Classic Amber`, `Red Alert`, and `Monochrome High-Contrast` themes; unlockable Reactor Core skins; screen shake; animated transitions; ASCII bar fallback; and `KEY_RESIZE` / small-terminal overlay.
+- **Progression & Social**: Operator Rank grades (`S+`–`D`), personal-best **Ghost Replay** tracker, exportable **Run Cards** (`~/.meltdown/last_run_card.md`), and in-game **Field Manual**.
+
 ## [2.3.0] - 2026-11-27
 
 ### Added
