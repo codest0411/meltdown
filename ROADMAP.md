@@ -1,97 +1,54 @@
-# 🗺️ MELTDOWN — Future Features & Design Roadmap
+# 🗺️ MELTDOWN — v4.0.0 Roadmap
 
-A structured blueprint for **MELTDOWN v3.0+**, covering new gameplay mechanics, UI/UX design, audio, multiplayer, progression, and technical improvements.
-
----
-
-## 1. 🎮 Gameplay & Mechanics
-
-### New Alarm Types
-- **HEX / OCTAL**: Convert hexadecimal (`0x2F` → `47`) or octal values to decimal.
-- **LOGIC GATE**: Solve quick boolean expressions (`1 AND 0`, `1 XOR 1`).
-- **PING / PORT**: Match a target system port or IP fragment shown in a noisy log stream.
-- **TYPO HUNT**: Spot and type the *one* misspelled word in a pair of station logs.
-- **HOLD / MASH**: Rapidly tap a key or type a short word multiple times to vent pressure.
-
-### Station Hazards & Status Effects
-- **Overheat**: Input buffer occasionally drops a character unless cooled.
-- **EMP Flicker**: Temporarily hides alarm labels (only the prompt remains visible).
-- **Radiation Leak**: Hull slowly ticks down until a `PURGE` alarm is cleared.
-- **Low Oxygen**: Stress rises faster until an `OXYGEN` alarm is resolved.
-
-### Upgrade & Perk System (Between Levels)
-Replace or expand static story choices with a **Reactor Bay Upgrade Draft** (pick 1 of 3):
-- **Auto-Coolant**: Passive `-1.5` stress/sec when fewer than 2 alarms are active.
-- **Reinforced Bulkhead**: Reduces hull damage per missed alarm by 5%.
-- **Buffer Shield**: First wrong `Enter` per level does not break your combo.
-- **Quick Fingers**: +15% score bonus for answers under 1.5 seconds.
-- **Power-up Magnet**: Higher power-up spawn rate and longer `FREEZE` duration.
-
-### New Game Modes
-- **Boss Rush**: Fight all 3 bosses back-to-back with minimal recovery between fights.
-- **Practice / Training Mode**: Pick any specific alarm type (e.g., `MORSE` or `BINARY`) and practice without hull/stress penalties.
-- **Custom Sandbox**: Configure starting level, alarm types, spawn speed, TTL, and mutators, then share a **Seed + Config Code** with friends.
-- **Mutators / Weekly Modifiers**:
-  - *Glass Cannon*: 1 HP hull, 2x score.
-  - *Blindfold*: All alarms hide after 1.5s.
-  - *Turbo*: 1.5x speed, 1.5x combo multiplier.
+> **v3.0.0 is shipped** on [PyPI](https://pypi.org/project/meltdown-terminal/) and [GitHub](https://github.com/codest0411/meltdown/releases/tag/v3.0.0).  
+> Below is the blueprint for **MELTDOWN v4.0.0**.
 
 ---
 
-## 2. 🎨 Terminal UI & Visual Design
+## 1. 🧩 Community Mods & Custom Content
 
-### Layout & Dashboard Overhaul
-Move from a single vertical list to a responsive **2-column cockpit layout** (when terminal width ≥ 100 cols, falling back to single-column on 80×24):
-- **Left Panel**: Active alarms, sorted by urgency, with color-coded priority badges (`[CRIT]`, `[WARN]`, `[OK]`).
-- **Right Panel**:
-  - Live **ASCII Reactor Core** graphic that changes animation speed/color with stress & hull.
-  - Active buffs/debuffs (`FREEZE 3.4s`, `OVERDRIVE x1.5`, `RADIATION`).
-  - Mini-log of recent actions (`+240 COMBO x4`, `REPAIR +20 HULL`).
-
-### Visual Polish & Feedback
-- **Screen Shake**: Brief 1–2px horizontal offset on hull damage or boss hits (disabled when `Reduced Flashing` is ON).
-- **Color Themes**: Unlockable or selectable terminal palettes:
-  - *Classic Amber* (retro CRT)
-  - *Cyber Cyan*
-  - *Red Alert*
-  - *Monochrome High-Contrast*
-- **Unicode Progress Bars**: Upgrade `[###---]` to smooth block bars `[███▒▒▒]` with an optional ASCII fallback setting for older terminals.
-- **Animated Transitions**: Warp-line or static-wipe transitions between levels and boss intros.
+- **Custom Word Packs (`~/.meltdown/words.txt`)**: Load player-defined word lists (e.g., Python keywords, cybersecurity terms, medical terms, or custom languages) right from Settings.
+- **Custom Alarm Plugin API**: Drop a `.py` file into `~/.meltdown/plugins/` to register new alarm types without editing the core package.
+- **Weekly Seeded Mutator Rotation**: Automatic ISO-week seed (`YYYY-Www`) pairing a fixed mutator + level ruleset with a dedicated weekly leaderboard.
 
 ---
 
-## 3. 🔊 Audio Design (Zero External Dependencies)
+## 2. 📖 Story Campaign 2.0 (Branching Sectors)
 
-Upgrade beyond `curses.beep()` using built-in OS tools (with graceful fallback):
-- **Windows**: `winsound.Beep(freq, ms)` in a background thread so gameplay never stutters.
-- **macOS / Linux**: Synthesize tiny in-memory WAV tones via Python's `wave` + `math` modules and play via `afplay` / `aplay` / `paplay`.
-- **Sound Events**:
-  - Rising pitch chime on combo streaks (`x2`, `x5`, `x10`).
-  - Low warning pulse when `STRESS > 80%` or `HULL < 25%`.
-  - Distinct power-up activation and boss phase-break tones.
-  - Optional **Volume / Mute** toggle in Settings.
+- **Sector Map Selection**: Between levels, choose between 2–3 station sectors (e.g., *Cryo Bay* with slower stress vs. *Reactor Spine* with 1.5x score).
+- **Dynamic Boss Dialogue & Weaknesses**: Bosses react to your accuracy, perks, and current hull, with phase-specific mechanics (e.g., EMP burst phase, speed-round phase).
+- **Ending Variations**: Multiple victory/epilogue endings at Level 7+ based on hull remaining, perks installed, and bosses defeated.
 
 ---
 
-## 4. 👥 Multiplayer & Community
+## 3. 🧠 New Alarm Types (Targeting 20 Total)
 
-- **LAN / Socket Co-op & Versus**: Play over local network (`socket` + `asyncio` or threads) on separate terminals instead of sharing one keyboard.
-- **Ghost Replays**: Record timestamped run events to JSON and race against your personal best's "ghost" progress bar.
-- **Shareable Run Cards**: Generate an ASCII/Markdown summary card at game over (score, level, accuracy, rank grade `S`/`A`/`B`/`C`) ready to copy-paste.
-
----
-
-## 5. 🏆 Progression & Rank System
-
-- **Operator Rank / Grade**: End-of-run grade (`S+`, `S`, `A`, `B`, `C`, `D`) based on accuracy, speed, and level reached.
-- **Unlockable Console Skins**: Unlock new title banners and reactor ASCII art via achievements.
-- **Alarm Encyclopedia / Field Manual**: An in-game `Help / Manual` menu showing examples and tips for all 10+ alarm types.
+- **REGEX MATCH**: Type a short string that matches a shown pattern (`^[a-z]{3}[0-9]{2}$`).
+- **COLOR / SYMBOL CODE**: Match a flashing ANSI/symbol sequence (`▲ ◆ ● ▲`).
+- **CHECKSUM**: Sum the digits of a packet ID (`4819 -> 22`).
+- **CIPHER (CAESAR +1 / ROT13)**: Decode a shifted 4-letter station callsign.
+- **DUAL-LOCK**: Two linked prompts that must be cleared back-to-back within 3 seconds.
 
 ---
 
-## 6. 🛠️ Technical & Packaging Improvements
+## 4. 🌐 Online / Relay Multiplayer & Replays
 
-- **Modular Package Structure**: Split `meltdown.py` into clean modules (`meltdown/alarms.py`, `meltdown/bosses.py`, `meltdown/ui.py`, `meltdown/save.py`, `meltdown/audio.py`) while keeping a single-command entry point.
-- **PyPI Distribution**: Add `pyproject.toml` so users can install and launch globally via `pip install meltdown-terminal` → `meltdown`.
-- **Automated Test Suite**: Add `pytest` / `unittest` tests for alarm generation, answer validation, scoring, save migration, and level scaling, plus GitHub Actions CI.
-- **Auto-Resize Handling**: Handle `curses.KEY_RESIZE` cleanly and show a friendly `"Terminal too small (need 80x24)"` overlay if shrunk below minimum dimensions.
+- **Online Relay Versus**: Lightweight optional WebSocket/TCP relay room codes (`JOIN ABC123`) so friends can play Versus across different networks without port-forwarding.
+- **Full Run Replay Theater**: Record keystrokes and timestamps to `~/.meltdown/replays/` and watch past runs play back at `1x` / `2x` / `4x` speed in the terminal.
+- **Live Ghost Bar**: Visual side-by-side progress bar racing against your personal best ghost in real time.
+
+---
+
+## 5. 🎨 Terminal UI & Audio Polish
+
+- **Live Terminal GIF / SVG Recorder**: Built-in `--record` flag or post-run export to save an animated SVG replay of your run.
+- **Smooth Status Animations**: Animated hazard borders during `RADIATION` / `LOW O2` and crisp level-clear fanfare screens.
+- **Multi-Tone Audio Chords**: Short 2–3 note arpeggios for level clear, rank `S+` achievement, and boss defeat.
+
+---
+
+## 6. 🛠️ Engineering & Distribution
+
+- **Automated PTY / Headless Terminal Tests**: End-to-end tests driving `meltdown` inside a pseudo-terminal (`pty` / `pexpect`) in CI.
+- **Homebrew Tap & Scoop Manifest**: One-line install via `brew install meltdown-terminal` (macOS/Linux) and `scoop install meltdown` (Windows).
+- **Zero-Config Windows Launcher**: Signed/trusted launcher options or automatic PATH/PowerShell helper (`meltdown setup-shell`) to avoid unsigned `.exe` wrapper blocks.
