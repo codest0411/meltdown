@@ -189,10 +189,14 @@ Capital letters do not matter. Answer in any order: your input is matched agains
 | <img src="assets/main_menu.png" alt="MELTDOWN Main Menu" width="400"> | <img src="assets/gameplay.png" alt="MELTDOWN Gameplay Cockpit" width="400"> |
 | **Boss Fight** | **Station Commendations** |
 | <img src="assets/boss_fight.png" alt="MELTDOWN Boss Fight" width="400"> | <img src="assets/achievements.png" alt="MELTDOWN Achievements" width="400"> |
-
-<img src="assets/game_over.png" alt="MELTDOWN CRT Hazard Box Game Over" width="440">
-
-<sub>CRT Hazard Box Game Over screen.</sub>
+| **Sector Navigation** | **Field Manual (20 Alarms)** |
+| <img src="assets/sector_map.png" alt="MELTDOWN Sector Navigation" width="400"> | <img src="assets/field_manual.png" alt="MELTDOWN Field Manual" width="400"> |
+| **Replay Theater** | **Orbital Leaderboard** |
+| <img src="assets/replay_theater.png" alt="MELTDOWN Replay Theater" width="400"> | <img src="assets/leaderboard.png" alt="MELTDOWN Leaderboard" width="400"> |
+| **Lifetime Telemetry** | **System Settings** |
+| <img src="assets/statistics.png" alt="MELTDOWN Statistics" width="400"> | <img src="assets/settings.png" alt="MELTDOWN Settings" width="400"> |
+| **Mission Debrief** | **CRT Hazard Box Game Over** |
+| <img src="assets/mission_debrief.png" alt="MELTDOWN Mission Debrief" width="400"> | <img src="assets/game_over.png" alt="MELTDOWN CRT Hazard Box Game Over" width="400"> |
 
 </div>
 
