@@ -206,3 +206,12 @@ Released under the [MIT License](LICENSE).
 - **GitHub Repository:** https://github.com/codest0411/meltdown
 - **Issue Tracker:** https://github.com/codest0411/meltdown/issues
 - **PyPI Package:** https://pypi.org/project/meltdown-terminal/
+
+
+---
+
+<div align="center">
+
+**☢️ MELTDOWN (`meltdown-terminal`)** · [MIT License](https://github.com/codest0411/meltdown/blob/main/LICENSE) · [PyPI](https://pypi.org/project/meltdown-terminal/) · [GitHub](https://github.com/codest0411/meltdown) · [Report a Bug](https://github.com/codest0411/meltdown/issues) · [Changelog](https://github.com/codest0411/meltdown/blob/main/CHANGELOG.md)
+
+</div>
