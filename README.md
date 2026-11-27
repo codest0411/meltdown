@@ -193,14 +193,7 @@ twine check dist/*
 Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 See [ROADMAP.md](ROADMAP.md) for planned features and [CHANGELOG.md](CHANGELOG.md) for release history.
 
-<div align="center">
 
-Special Thanks for this Guy 
-[Yup-45](https://github.com/yup-45)
-
-Thanks Buddy !
-
-</div>
 
 ## 🔒 Security
 
@@ -222,5 +215,15 @@ Released under the [MIT License](LICENSE).
 <div align="center">
 
 **☢️ MELTDOWN (`meltdown-terminal`)** · [MIT License](https://github.com/codest0411/meltdown/blob/main/LICENSE) · [PyPI](https://pypi.org/project/meltdown-terminal/) · [GitHub](https://github.com/codest0411/meltdown) · [Report a Bug](https://github.com/codest0411/meltdown/issues) · [Changelog](https://github.com/codest0411/meltdown/blob/main/CHANGELOG.md)
+
+</div>
+
+
+<div align="center">
+
+Special Thanks for this Guy 
+[Yup-45](https://github.com/yup-45)
+
+Thanks Buddy !
 
 </div>
