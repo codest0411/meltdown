@@ -76,3 +76,26 @@ def test_game_main_menu_exits_cleanly_with_mocked_stdscr(tmp_path):
         sm = game.SaveManager(data_dir=str(tmp_path))
         g = game.Game(stdscr, sm)
         assert g.main_menu() == "quit"
+
+
+def test_show_game_over_renders_cleanly_with_mocked_stdscr(tmp_path):
+    stdscr = MagicMock()
+    stdscr.getmaxyx.return_value = (30, 100)
+    stdscr.getch.return_value = 10
+
+    with patch("meltdown.game.curses.curs_set"), patch(
+        "meltdown.game.curses.color_pair", return_value=0
+    ), patch("meltdown.game.curses.flushinp"):
+        sm = game.SaveManager(data_dir=str(tmp_path))
+        g = game.Game(stdscr, sm)
+        g.score = 8420
+        g.stats.correct = 42
+        g.stats.wrong = 4
+        g.stats.combo_max = 14
+        g.show_game_over(6, "Your hull ruptured.")
+        rendered = " ".join(
+            str(call.args[2]) for call in stdscr.addstr.call_args_list if len(call.args) >= 3
+        )
+        assert "G A M E   O V E R" in rendered
+        assert "STATION LOST" in rendered
+        assert "RUN SUMMARY" in rendered

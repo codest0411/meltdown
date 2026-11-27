@@ -1916,16 +1916,74 @@ class Game:
 
             idx += 1
 
+    def show_game_over(self, idx, why):
+        """Render the retro CRT Hazard Box Game Over screen."""
+        self.s.nodelay(False)
+        curses.curs_set(0)
+        self.s.erase()
+        self.h, self.w = self.s.getmaxyx()
+
+        R, Y, C, G = self.C(3), self.C(2), self.C(4), self.C(1)
+        bw = min(self.w - 4, 68)
+        bh = min(self.h - 4, 19)
+        bx = max(1, (self.w - bw) // 2)
+        by = max(2, (self.h - bh) // 2)
+
+        caution = "/// CAUTION /// CRITICAL BREACH /// CAUTION ///"
+        self.center(max(0, by - 1), caution, Y | curses.A_BOLD)
+        self.box(by, bx, bh, bw, "STATION LOST", R, double=True)
+
+        core_art = [
+            "  .-\u2550\u2550\u2550-.  ",
+            " / \\ | / \\ ",
+            "\u2502 \u2500 (X) \u2500 \u2502",
+            " \\ / | \\ / ",
+            "  '-\u2550\u2550\u2550-'  ",
+        ]
+        ay = by + 2
+        for i, line in enumerate(core_art):
+            if ay + i < by + bh - 1:
+                self.center(ay + i, line, R | curses.A_BOLD)
+
+        gy = ay + 6
+        if gy < by + bh - 1:
+            self.center(gy, "G A M E   O V E R", R | curses.A_BOLD)
+        if gy + 1 < by + bh - 1:
+            self.center(gy + 1, why)
+
+        best = max(self.sm.best_score(), self.score)
+        if self.score > 0 and self.score >= best and gy + 2 < by + bh - 5:
+            self.center(gy + 2, "[ * NEW HIGH SCORE! * ]", G | curses.A_BOLD)
+
+        inner_w = min(bw - 8, 54)
+        inner_h = 5
+        ix = max(bx + 2, (self.w - inner_w) // 2)
+        iy = min(by + bh - 7, gy + 3)
+        if iy > gy + 1 and iy + inner_h < by + bh - 1:
+            self.box(iy, ix, inner_h, inner_w, "RUN SUMMARY", Y)
+            self.center(
+                iy + 1,
+                f"LVL {idx + 1}   |   SCORE {self.score:,}   |   BEST {best:,}",
+                C | curses.A_BOLD,
+            )
+            self.center(
+                iy + 2,
+                f"COMBO x{self.stats.combo_max}   |   ACCURACY {self.stats.accuracy:.1f}%",
+                G,
+            )
+
+        self.center(min(by + bh - 2, iy + inner_h + 1), "[ PRESS ANY KEY ]", Y | curses.A_BOLD)
+        self.center(min(self.h - 1, by + bh), caution, Y | curses.A_BOLD)
+        self.s.refresh()
+        self.s.getch()
+        curses.flushinp()
+        curses.curs_set(1)
+
     def _finish_game(self, idx, reason):
         self.sm.clear_state()
         why = ("Your hull ruptured." if self.hull <= 0
                else "You cracked under the stress.")
-        self.screen([
-            ("*** STATION LOST ***", self.C(3) | curses.A_BOLD),
-            (why, 0), ("", 0),
-            (f"Reached level {idx + 1}   Score {self.score}", 0),
-            ("", 0), ("Press any key...", 0),
-        ])
+        self.show_game_over(idx, why)
 
         # update stats
         sd = self.stats.to_dict()
