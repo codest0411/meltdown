@@ -5,6 +5,12 @@ All notable changes to **MELTDOWN** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-11-27
+
+### Added
+- **CRT Hazard Box Game Over Screen**: Retro double-bordered `STATION LOST` screen with caution hazard stripes, symmetrical fractured reactor core symbol, `[ * NEW HIGH SCORE! * ]` badge, and inner `RUN SUMMARY` card.
+- **Idempotent PyPI Publishing**: Enabled `skip-existing: true` in `.github/workflows/publish.yml` so re-running the publish workflow on an already-uploaded version succeeds cleanly instead of failing.
+
 ## [2.2.0] - 2026-11-26
 
 ### Added
