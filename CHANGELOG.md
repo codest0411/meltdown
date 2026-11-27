@@ -5,6 +5,18 @@ All notable changes to **MELTDOWN** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-11-27
+
+### Added
+- **Custom Word Packs & Plugin API**: Load `~/.meltdown/words.txt` and custom alarm plugins from `~/.meltdown/plugins/*.py`.
+- **Weekly Seeded Challenge**: ISO-week seeded mutator rotation with weekly leaderboard tracking.
+- **5 New Alarm Types (20 Total)**: `REGEX`, `SYMBOL`, `CHECKSUM`, `CIPHER`, and `DUAL-LOCK`.
+- **Branching Sector Navigation**: Choose between *Cryo Bay*, *Reactor Spine*, and *Cargo Lock* between levels.
+- **Online Room-Code Versus**: Deterministic room-code port mapping for quick peer matches.
+- **Replay Theater & `--record` SVG Export**: Watch past runs at `1x`/`2x`/`4x`, race a live visual Ghost bar, and export animated SVG replays.
+- **Audio Chords & Hazard Borders**: Multi-tone arpeggios and flashing hazard borders during radiation/low-O2 alerts.
+- **`meltdown setup-shell`**: One-command PowerShell `$PROFILE` setup helper for Windows.
+
 ## [3.0.0] - 2026-11-27
 
 ### Added

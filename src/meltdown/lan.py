@@ -1,7 +1,14 @@
 """Zero-dependency local network (LAN) socket helper for MELTDOWN Versus."""
 
+import hashlib
 import json
 import socket
+
+
+def room_code_to_port(room_code: str) -> int:
+    """Deterministically map a short room code (e.g. 'ABC123') to a high TCP port."""
+    digest = hashlib.md5(room_code.strip().upper().encode("utf-8")).hexdigest()
+    return 50000 + (int(digest[:4], 16) % 10000)
 
 
 def get_local_ip() -> str:

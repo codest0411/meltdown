@@ -124,3 +124,29 @@ class Sound:
     @classmethod
     def warning_pulse(cls):
         cls.play_tone(300, 60)
+
+    @classmethod
+    def chord(cls, freqs, note_ms: int = 75):
+        """Play a short multi-tone arpeggio chord asynchronously."""
+        if not cls.enabled:
+            return
+
+        def _seq():
+            import time as _t
+            for f in freqs:
+                cls.play_tone(f, note_ms)
+                _t.sleep(note_ms / 1000.0)
+
+        threading.Thread(target=_seq, daemon=True).start()
+
+    @classmethod
+    def level_clear(cls):
+        cls.chord([523, 659, 784], 70)
+
+    @classmethod
+    def rank_s(cls):
+        cls.chord([587, 740, 880, 1175], 80)
+
+    @classmethod
+    def boss_defeat(cls):
+        cls.chord([392, 523, 659, 1046], 90)

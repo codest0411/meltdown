@@ -74,8 +74,8 @@ def test_sandbox_code_roundtrip():
 def test_audio_themes_skins_and_manual():
     wav = _synth_wav_bytes(440, 50)
     assert wav[:4] == b"RIFF"
-    assert len(ALL_KINDS) == 15
-    assert len(ALARM_MANUAL) == 15
+    assert len(ALL_KINDS) >= 20
+    assert len(ALARM_MANUAL) == len(ALL_KINDS)
     assert {"cyber_cyan", "classic_amber", "red_alert", "mono_hc"} <= set(THEMES.keys())
     assert {"default", "sentinel", "singularity", "nightmare"} <= set(SKINS.keys())
 

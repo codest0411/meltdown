@@ -49,6 +49,7 @@ DEFAULT_SETTINGS = {
     "colorblind": False,
     "large_ui": False,
     "ascii_bars": False,
+    "custom_words": True,
     "theme": "cyber_cyan",
     "skin": "default",
 }
@@ -56,6 +57,7 @@ DEFAULT_SETTINGS = {
 DEFAULT_DATA = {
     "scores": [],
     "daily": {},
+    "weekly": {},
     "achievements": [],
     "settings": dict(DEFAULT_SETTINGS),
     "lifetime": {
@@ -199,6 +201,72 @@ class SaveManager:
 
     def get_daily(self):
         return self.data["daily"].get(date.today().isoformat())
+
+    def set_weekly(self, score, level, mutator="none"):
+        key = date.today().strftime("%G-W%V")
+        cur = self.data.setdefault("weekly", {}).get(key, {})
+        if score > cur.get("score", 0):
+            self.data["weekly"][key] = {"score": score, "level": level, "mutator": mutator}
+            self.save()
+
+    def get_weekly(self):
+        key = date.today().strftime("%G-W%V")
+        return self.data.get("weekly", {}).get(key)
+
+    def save_replay(self, events, score, level, rank):
+        """Save full run replay events to ~/.meltdown/replays/last_run.json."""
+        try:
+            rdir = os.path.join(self.save_dir, "replays")
+            os.makedirs(rdir, exist_ok=True)
+            path = os.path.join(rdir, "last_run.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"score": score, "level": level, "rank": rank, "events": events[:500]}, f)
+            return path
+        except Exception:
+            return ""
+
+    def load_replay(self):
+        try:
+            path = os.path.join(self.save_dir, "replays", "last_run.json")
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+
+    def export_animated_svg(self, events, score, rank, out_path=None):
+        """Export an animated SVG terminal replay of the run."""
+        if not out_path:
+            out_path = os.path.join(self.save_dir, "last_run.svg")
+        lines = [
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420" '
+            f'font-family="Consolas, Menlo, monospace" font-size="14">',
+            '<rect width="760" height="420" rx="12" fill="#0d1117" stroke="#30363d"/>',
+            '<rect width="760" height="34" rx="12" fill="#161b22"/>',
+            '<circle cx="20" cy="17" r="5" fill="#f85149"/>'
+            '<circle cx="38" cy="17" r="5" fill="#d29922"/>'
+            '<circle cx="56" cy="17" r="5" fill="#3fb950"/>',
+            f'<text x="380" y="21" text-anchor="middle" fill="#8b949e">MELTDOWN REPLAY :: SCORE {score} :: RANK {rank}</text>',
+        ]
+        y = 64
+        for idx, ev in enumerate(events[:14]):
+            t_sec = ev.get("t", 0.0)
+            msg = str(ev.get("msg", "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            col = ev.get("col", "#3fb950")
+            lines.append(
+                f'<text x="24" y="{y}" fill="{col}" opacity="0">'
+                f'[{t_sec:5.1f}s] {msg}'
+                f'<animate attributeName="opacity" from="0" to="1" begin="{idx * 0.35:.2f}s" dur="0.2s" fill="freeze"/>'
+                f'</text>'
+            )
+            y += 24
+        lines.append("</svg>")
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+            return out_path
+        except Exception:
+            return ""
 
     def save_state(self, state):
         self.data["save_state"] = state

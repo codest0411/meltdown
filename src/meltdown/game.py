@@ -18,6 +18,7 @@ from meltdown.alarms import (
     ALARM_MANUAL,
     ALL_KINDS,
     MORSE,
+    PLUGIN_ALARMS,
     POWERUP_TYPES,
     SHORT_WORDS,
     WORDS,
@@ -25,6 +26,8 @@ from meltdown.alarms import (
     WORDS_HARD,
     WORDS_MED,
     Alarm,
+    load_alarm_plugins,
+    load_custom_words,
 )
 from meltdown.audio import Sound
 from meltdown.bosses import BOSS_AFTER_LEVEL, BOSSES
@@ -33,6 +36,7 @@ from meltdown.lan import (
     host_lan_handshake,
     join_lan_handshake,
     recv_json,
+    room_code_to_port,
     send_json,
 )
 from meltdown.save import (
@@ -166,6 +170,24 @@ def daily_seed():
     return int(hashlib.md5(date.today().isoformat().encode()).hexdigest(), 16) % (2**31)
 
 
+def weekly_seed():
+    wk = date.today().strftime("%G-W%V")
+    return int(hashlib.md5(wk.encode()).hexdigest(), 16) % (2**31)
+
+
+def weekly_mutator():
+    wk = date.today().strftime("%G-W%V")
+    idx = int(hashlib.md5(wk.encode()).hexdigest(), 16) % 3
+    return ["glass_cannon", "blindfold", "turbo"][idx]
+
+
+SECTORS = [
+    ("CRYO BAY",      "Slower stress buildup (0.75x stress)", 0.75, 1.0,  0),
+    ("REACTOR SPINE", "High risk, +35% score multiplier",     1.15, 1.35, 0),
+    ("CARGO LOCK",    "Reinforced bulkhead (+15% hull)",      1.0,  1.0,  15),
+]
+
+
 def encode_sandbox_code(seed: int, start_lvl: int, mutator: str) -> str:
     """Create a short shareable Sandbox config code."""
     m_code = {"none": "N", "glass_cannon": "G", "blindfold": "B", "turbo": "T"}.get(mutator, "N")
@@ -191,9 +213,10 @@ def decode_sandbox_code(code: str):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class Game:
-    def __init__(self, s, save_mgr):
+    def __init__(self, s, save_mgr, record_path=None):
         self.s = s
         self.sm = save_mgr
+        self.record_path = record_path
         self.score = 0
         self.combo = 0
         self.stress = 0.0
@@ -208,14 +231,19 @@ class Game:
         self.ttl_bonus = 0.0
         self.score_mult = 1.0
         self.pup_bonus = 0.0
+        self.sector_stress_mult = 1.0
         self.freeze_until = 0.0
         self.shake_until = 0.0
         self.daily = False
+        self.weekly = False
         self.recent_prompts = collections.deque(maxlen=15)
         self.event_log = collections.deque(maxlen=5)
         self.ghost_timeline = []
+        self.replay_events = []
         self._last_ghost_t = -1.0
         self._last_warn_beep = 0.0
+        self.custom_words = load_custom_words(save_mgr.save_dir)
+        load_alarm_plugins(save_mgr.save_dir)
         # co-op state
         self.active_p = 0
         self.p_combos = [0, 0]
@@ -379,7 +407,7 @@ class Game:
             bx = max(1, (self.w - box_w) // 2)
             by = max(1, (self.h - box_h) // 2)
 
-            self.box(by, bx, box_h, box_w, "ORBITAL COMMAND OS :: v3.0", self.C(4), double=True)
+            self.box(by, bx, box_h, box_w, "ORBITAL COMMAND OS :: v4.0", self.C(4), double=True)
             cur_y = by + 2
             if banner:
                 for b_line in banner:
@@ -473,11 +501,13 @@ class Game:
             "New Game": "Solo, Co-op, Versus, Boss Rush, Practice, Sandbox, or LAN",
             "Continue": "Resume your auto-saved station shift",
             "Daily Challenge": "Today's global seeded 5-level gauntlet",
-            "Field Manual": "Encyclopedia & examples for all 15 alarm types",
-            "Leaderboard": "Top 10 operator scores and today's daily best",
+            "Weekly Challenge": "This week's seeded mutator gauntlet",
+            "Replay Theater": "Watch your last recorded run at 1x/2x/4x speed",
+            "Field Manual": "Encyclopedia & examples for all 20 alarm types",
+            "Leaderboard": "Top 10 operator scores, daily & weekly bests",
             "Achievements": "View all 19 station commendations",
             "Statistics": "Lifetime accuracy, speed, and mission totals",
-            "Settings": "Audio, themes, skins, colorblind mode & accessibility",
+            "Settings": "Audio, themes, skins, custom words & accessibility",
             "Quit": "Power down the orbital console",
         }
         while True:
@@ -485,8 +515,9 @@ class Game:
             has_save = self.sm.load_state() is not None
             if has_save:
                 opts.append("Continue")
-            opts += ["Daily Challenge", "Field Manual", "Leaderboard",
-                     "Achievements", "Statistics", "Settings", "Quit"]
+            opts += ["Daily Challenge", "Weekly Challenge", "Replay Theater",
+                     "Field Manual", "Leaderboard", "Achievements",
+                     "Statistics", "Settings", "Quit"]
             best = self.sm.best_score()
             ach_got = len(self.sm.data.get("achievements", []))
             sub = f"BEST: {best}  |  MEDALS: {ach_got}/{len(ACH_DEFS)}"
@@ -504,6 +535,10 @@ class Game:
                 self.continue_game()
             elif picked == "Daily Challenge":
                 self.play_daily()
+            elif picked == "Weekly Challenge":
+                self.play_weekly()
+            elif picked == "Replay Theater":
+                self.play_replay()
             elif picked == "Field Manual":
                 self.show_manual()
             elif picked == "Leaderboard":
@@ -570,9 +605,9 @@ class Game:
     # ── settings ────────────────────────────────────────────────────────────
 
     def settings_menu(self):
-        keys = ["sound", "reduced_flash", "show_timer_numbers", "colorblind", "large_ui", "ascii_bars"]
+        keys = ["sound", "reduced_flash", "show_timer_numbers", "colorblind", "large_ui", "ascii_bars", "custom_words"]
         labels = ["Sound Effects", "Reduced Flashing", "Show Timer Numbers",
-                  "Colorblind Mode", "Large UI", "ASCII Progress Bars"]
+                  "Colorblind Mode", "Large UI", "ASCII Progress Bars", "Custom Word Pack"]
         theme_keys = list(THEMES.keys())
         skin_keys = [k for k, v in SKINS.items() if not v["req"] or self.sm.has_ach(v["req"])]
         while True:
@@ -1042,7 +1077,7 @@ class Game:
                         continue
 
                     normal = [a for a in alarms if not a.is_boss and not a.is_powerup and not a.is_hazard]
-                    hits = [a for a in normal if a.answer == guess]
+                    hits = [a for a in normal if a.matches(guess)]
                     if hits:
                         a = min(hits, key=lambda x: x.born + x.ttl)
                         if not a.hit_mash():
@@ -1065,6 +1100,7 @@ class Game:
                         self.stats.combo_max = max(self.stats.combo_max, self.combo)
                         Sound.combo(self.combo)
                         msg = f"+{pts}  COMBO x{self.combo}"
+                        self.replay_events.append({"t": round(elapsed_run, 1), "msg": f"CLEARED {a.label} ({guess}) +{pts}", "col": "#3fb950"})
                         msg_col, msg_until = G, now + 1.2
                         self.check_ach(combo=self.combo, speed=resp)
                     else:
@@ -1111,10 +1147,12 @@ class Game:
                         count = min(3, need, max_active - active_normal)
                         msg, msg_col, msg_until = "!! SURGE !!", R, now + 1.5
                         Sound.surge()
+                    use_custom = self.custom_words if self.sm.settings.get("custom_words", True) else None
+                    spawn_pool = list(kinds) + list(PLUGIN_ALARMS.keys())
                     for _ in range(count):
-                        alarms.append(Alarm(random.choice(kinds), ttl, now,
+                        alarms.append(Alarm(random.choice(spawn_pool), ttl, now,
                                             level=idx, recent=self.recent_prompts,
-                                            blindfold=blindfold))
+                                            blindfold=blindfold, custom_words=use_custom))
                     next_spawn = now + spawn * random.uniform(0.6, 1.4)
 
             # ── power-up spawn ──
@@ -1180,7 +1218,7 @@ class Game:
             if not frozen and not practice:
                 active_stress = sum(1 for a in alarms if not a.is_powerup)
                 if active_stress > 0:
-                    self.stress += dt * active_stress * pressure
+                    self.stress += dt * active_stress * pressure * self.sector_stress_mult
                     if active_stress < 2 and "auto_coolant" in self.perks:
                         self.stress -= dt * 1.5
                 else:
@@ -1208,6 +1246,8 @@ class Game:
             title_str = f" MELTDOWN :: {'PRACTICE' if practice else f'LVL {idx + 1} {name}'} "
             if self.daily:
                 title_str = f" DAILY CHALLENGE :: LVL {idx + 1} {name} "
+            elif self.weekly:
+                title_str = f" WEEKLY CHALLENGE :: LVL {idx + 1} {name} "
             self.put(0, shake_x, title_str.ljust(self.w - 1), curses.A_REVERSE | (R if panic else C))
 
             best = max(self.sm.best_score(), self.score)
@@ -1232,7 +1272,10 @@ class Game:
                 right_w = 38
                 left_w = self.w - right_w - 1
                 panel_h = max(8, self.h - 6)
-                self.box(2, shake_x, panel_h, left_w, "INCOMING ALARMS", R if panic else C)
+                hazard_flash = (rad_active or oxy_active) and not reduced and int(now * 4) % 2 == 0
+                box_col = R if (panic or hazard_flash) else C
+                box_title = "!! HAZARD ALERT !!" if hazard_flash else "INCOMING ALARMS"
+                self.box(2, shake_x, panel_h, left_w, box_title, box_col)
                 self.box(2, left_w + 1 + shake_x, panel_h, right_w, "REACTOR TELEMETRY", C)
 
                 rx = left_w + 3 + shake_x
@@ -1257,7 +1300,9 @@ class Game:
 
                 ghost_s = self.sm.get_ghost_score_at(elapsed_run)
                 if ghost_s > 0:
-                    self.put(14, rx, f"GHOST BEST: {ghost_s}", M)
+                    g_frac = min(1.0, self.score / max(1, ghost_s))
+                    self.bar(14, rx, "GHOST ", g_frac, max(6, rbw - 8), M)
+                    self.put(14, rx + max(6, rbw - 8) + 9, f"{ghost_s}", M)
 
                 self.put(15, rx, "\u2500" * (right_w - 4), C)
                 self.put(16, rx, "COMMS LOG", C | curses.A_BOLD)
@@ -1578,6 +1623,7 @@ class Game:
             self.s.refresh()
             time.sleep(0.03)
 
+        Sound.boss_defeat()
         self.check_ach(boss_kill=True, boss_idx=boss_idx)
         bonus = 1000 * (boss_idx + 1)
         self.score += bonus
@@ -1602,6 +1648,8 @@ class Game:
         self.stats.reset()
         self.ach_queue.clear()
         self.ghost_timeline = []
+        self.replay_events = []
+        self.sector_stress_mult = 1.0
         self._last_ghost_t = -1.0
         self.freeze_until = 0.0
         self.shake_until = 0.0
@@ -1642,6 +1690,7 @@ class Game:
             self.stress = max(0, self.stress - 30)
             self.check_ach(level_clear=True, level=idx, check_all_types=True)
             self._auto_save(idx + 1)
+            Sound.level_clear()
 
             self.screen([(f"LEVEL {idx + 1} CLEARED", self.C(1) | curses.A_BOLD),
                          (f"Bonus +{bonus}   Hull repaired", 0), ("", 0),
@@ -1651,6 +1700,7 @@ class Game:
             self.show_choice(idx)
             if idx in (0, 2, 4):
                 self.draft_perks()
+            self.choose_sector()
 
             if idx in BOSS_AFTER_LEVEL:
                 br = self.run_boss(BOSS_AFTER_LEVEL[idx])
@@ -1734,11 +1784,19 @@ class Game:
         self.play(start_idx=start_lvl)
 
     def play_lan(self):
-        ci = self.menu("LAN VERSUS", ["Host Match", "Join Match"], "Local network head-to-head")
+        ci = self.menu("LAN / ROOM-CODE VERSUS",
+                       ["Host Match (LAN IP)", "Join Match (LAN IP)",
+                        "Host Room Code", "Join Room Code"],
+                       "Head-to-head over local network or room code")
         if ci == -1:
             return
         port = 50555
-        if ci == 0:
+        if ci in (2, 3):
+            rc = self.prompt_text("ROOM CODE", "Enter shared Room Code (e.g. ALPHA1):", max_len=16)
+            if not rc:
+                return
+            port = room_code_to_port(rc)
+        if ci in (0, 2):
             di = self.menu("SELECT DIFFICULTY", ["Casual", "Operator", "Nightmare"], "Host difficulty")
             if di == -1:
                 return
@@ -1746,23 +1804,23 @@ class Game:
             seed = random.randint(1, 2**30)
             ip = get_local_ip()
             self.screen([
-                ("HOSTING LAN MATCH", self.C(4) | curses.A_BOLD),
-                (f"Tell peer to join: {ip}:{port}", self.C(2) | curses.A_BOLD),
+                ("HOSTING MATCH", self.C(4) | curses.A_BOLD),
+                (f"Peer connects to: {ip}:{port}", self.C(2) | curses.A_BOLD),
                 ("Waiting for connection (up to 45s)...", 0),
             ], wait_key=False)
             try:
                 conn = host_lan_handshake(port, seed, self.diff, timeout=45.0)
             except Exception as exc:
-                self.screen([("LAN Host Failed", self.C(3) | curses.A_BOLD), (str(exc), 0), ("", 0), ("Press any key...", 0)])
+                self.screen([("Host Failed", self.C(3) | curses.A_BOLD), (str(exc), 0), ("", 0), ("Press any key...", 0)])
                 return
         else:
-            host = self.prompt_text("JOIN LAN MATCH", "Enter Host IP (e.g. 192.168.1.10):", max_len=40)
+            host = self.prompt_text("JOIN MATCH", "Enter Host IP (e.g. 127.0.0.1):", max_len=40)
             if not host:
                 return
             try:
                 conn, seed, self.diff = join_lan_handshake(host.strip(), port, timeout=15.0)
             except Exception as exc:
-                self.screen([("LAN Join Failed", self.C(3) | curses.A_BOLD), (str(exc), 0), ("", 0), ("Press any key...", 0)])
+                self.screen([("Join Failed", self.C(3) | curses.A_BOLD), (str(exc), 0), ("", 0), ("Press any key...", 0)])
                 return
 
         try:
@@ -1876,6 +1934,13 @@ class Game:
         sd["score"] = self.score
         self.sm.update_lifetime(sd)
         self.sm.save_ghost(self.score, self.ghost_timeline)
+        rank = compute_rank(self.score, self.stats.accuracy, idx + 1)
+        if rank in ("S+", "S"):
+            Sound.rank_s()
+        self.sm.save_replay(self.replay_events, self.score, idx + 1, rank)
+        if self.record_path:
+            out = None if self.record_path == "AUTO" else self.record_path
+            self.sm.export_animated_svg(self.replay_events, self.score, rank, out_path=out)
 
         if self.sm.qualifies(self.score):
             initials = self.get_initials()
@@ -1884,9 +1949,96 @@ class Game:
         if self.daily:
             self.sm.set_daily(self.score, idx + 1)
             self.check_ach(daily=True)
+        if self.weekly:
+            self.sm.set_weekly(self.score, idx + 1, self.mutator)
 
         self.show_game_stats(level_reached=idx + 1)
         return "done"
+
+    def choose_sector(self):
+        """Branching sector map selection between levels."""
+        opts = [f"{s[0]}: {s[1]}" for s in SECTORS]
+        ci = self.menu("SECTOR NAVIGATION", opts, "Plot your next station sector")
+        if ci == -1:
+            ci = 0
+        _, _, s_mult, sc_mult, hull_b = SECTORS[ci]
+        self.sector_stress_mult = s_mult
+        self.score_mult *= sc_mult
+        if hull_b:
+            self.hull = min(100, self.hull + hull_b)
+
+    def play_weekly(self):
+        self.weekly = True
+        random.seed(weekly_seed())
+        self.diff = "operator"
+        self.mode = "solo"
+        self.mutator = weekly_mutator()
+        self._reset_run()
+        wk = date.today().strftime("%G-W%V")
+        self.screen([
+            ("WEEKLY CHALLENGE", self.C(5) | curses.A_BOLD),
+            (f"Week: {wk}  |  Mutator: {MUTATORS[self.mutator][0]}", self.C(2)),
+            ("", 0),
+            ("5 levels with this week's global mutator.", 0),
+            ("Press any key...", self.C(2)),
+        ])
+        for idx in range(5):
+            name, flavour, *_ = level_cfg(idx)
+            self.screen([(f"WEEKLY - LVL {idx + 1}", self.C(4) | curses.A_BOLD),
+                         (name, self.C(3) | curses.A_BOLD), ("", 0), (flavour, 0)], wait_key=False)
+            result = self.run_level(idx)
+            if result == "dead":
+                self.weekly = False
+                return self._finish_game(idx, "dead")
+            if result in ("quit", "restart"):
+                self.weekly = False
+                return result
+            self.score += 500 * (idx + 1)
+            self.hull = min(100, self.hull + 10)
+            self.stress = max(0, self.stress - 30)
+        self.sm.set_weekly(self.score, 5, self.mutator)
+        sd = self.stats.to_dict()
+        sd["score"] = self.score
+        self.sm.update_lifetime(sd)
+        self.screen([("WEEKLY CHALLENGE COMPLETE!", self.C(1) | curses.A_BOLD),
+                     (f"Score: {self.score}", 0), ("", 0), ("Press any key...", self.C(2))])
+        self.show_game_stats(level_reached=5)
+        self.weekly = False
+
+    def play_replay(self):
+        """Watch the last recorded run in Replay Theater at 1x/2x/4x speed."""
+        rep = self.sm.load_replay()
+        if not rep or not rep.get("events"):
+            self.screen([("REPLAY THEATER", self.C(4) | curses.A_BOLD),
+                         ("No saved replay yet. Complete a run first!", 0),
+                         ("", 0), ("Press any key...", 0)])
+            return
+        si = self.menu("REPLAY THEATER", ["1x Speed", "2x Speed", "4x Speed"],
+                       f"Last Run: Score {rep.get('score', 0)}  Rank {rep.get('rank', '?')}")
+        if si == -1:
+            return
+        speed = [1.0, 2.0, 4.0][si]
+        events = rep["events"]
+        self.s.nodelay(True)
+        for i in range(len(events)):
+            if self.s.getch() == 27:
+                break
+            self.s.erase()
+            self.h, self.w = self.s.getmaxyx()
+            bw = min(self.w - 4, 72)
+            bh = min(self.h - 2, 18)
+            bx, by = max(1, (self.w - bw) // 2), max(1, (self.h - bh) // 2)
+            self.box(by, bx, bh, bw, f"REPLAY THEATER ({speed:.0f}x) :: SCORE {rep.get('score', 0)}", self.C(4), double=True)
+            window = events[max(0, i - (bh - 5)):i + 1]
+            for j, ev in enumerate(window):
+                self.put(by + 2 + j, bx + 3, f"[{ev.get('t', 0):5.1f}s] {ev.get('msg', '')}"[:bw - 6], self.C(1))
+            self.center(min(self.h - 1, by + bh + 1), "[Esc] Exit Replay", self.C(4))
+            self.s.refresh()
+            time.sleep(0.35 / speed)
+        self.s.nodelay(False)
+        self.center(self.h - 2, "Replay finished. Press any key...", self.C(2))
+        self.s.refresh()
+        self.s.getch()
 
     def continue_game(self):
         state = self.sm.load_state()
@@ -2032,7 +2184,7 @@ class Game:
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def main(stdscr):
+def main(stdscr, record_path=None):
     curses.curs_set(1)
     stdscr.nodelay(True)
     stdscr.keypad(True)
@@ -2046,14 +2198,14 @@ def main(stdscr):
     sm = SaveManager()
     apply_theme(sm.settings.get("theme", "cyber_cyan"))
     Sound.enabled = sm.settings.get("sound", True)
-    g = Game(stdscr, sm)
+    g = Game(stdscr, sm, record_path=record_path)
     g.main_menu()
 
 
-def run() -> int:
+def run(record_path=None) -> int:
     """Launch the game inside curses, restoring the terminal on exit."""
     try:
-        curses.wrapper(main)
+        curses.wrapper(lambda stdscr: main(stdscr, record_path=record_path))
         return 0
     except KeyboardInterrupt:
         print("Station abandoned. Coward.")
