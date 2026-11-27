@@ -68,7 +68,14 @@ meltdown
 
 ```bash
 pip install meltdown-terminal
+
 meltdown
+OR
+
+(ONLY IF 'meltdown' is not recognized)
+
+python -m meltdown 
+
 ```
 
 ### Installing from source
